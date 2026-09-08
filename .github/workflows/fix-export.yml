@@ -120,3 +120,5 @@ jobs:
           git add index.html
           git commit -m "Fix PDF export function"
           git push origin Master
+
+# Trigger the one-time patch workflow after creation.

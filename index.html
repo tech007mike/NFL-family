@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Week 1 NFL Picks</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js"></script>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;background:#ececec;font-family:Arial,sans-serif}
@@ -65,25 +65,98 @@ function drawCheck(pdf, f) {
 
 function exportPDF() {
   saveState();
-  if (!window.jspdf || !window.jspdf.jsPDF) {
-    alert("PDF export library could not load. Please check your internet connection.");
-    return;
+
+  const button = document.querySelector(".toolbar button");
+  const originalText = button ? button.textContent : "Export PDF";
+
+  try {
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      throw new Error("PDF library did not load.");
+    }
+
+    const img = document.getElementById("sheetImage");
+    const sheet = document.getElementById("sheet");
+
+    // Keep export synchronous from the button click for better mobile-browser support.
+    if (!img || !img.complete || !img.naturalWidth) {
+      alert("The worksheet is still loading. Please wait a moment and tap Export PDF again.");
+      return;
+    }
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Exporting...";
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not create export canvas.");
+
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    // Remove the printed Name / Date row in the exported copy.
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(
+      0,
+      canvas.height * 0.1185,
+      canvas.width,
+      canvas.height * 0.0305
+    );
+
+    // Flatten selected checkmarks into the image.
+    const sheetRect = sheet.getBoundingClientRect();
+    ctx.strokeStyle = "#111111";
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    document.querySelectorAll(".pick:checked").forEach(el => {
+      const r = el.getBoundingClientRect();
+      const x = ((r.left - sheetRect.left) / sheetRect.width) * canvas.width;
+      const y = ((r.top - sheetRect.top) / sheetRect.height) * canvas.height;
+      const w = (r.width / sheetRect.width) * canvas.width;
+      const h = (r.height / sheetRect.height) * canvas.height;
+
+      ctx.lineWidth = Math.max(3, w * 0.10);
+      ctx.beginPath();
+      ctx.moveTo(x + w * 0.18, y + h * 0.52);
+      ctx.lineTo(x + w * 0.42, y + h * 0.76);
+      ctx.lineTo(x + w * 0.84, y + h * 0.22);
+      ctx.stroke();
+    });
+
+    const flatImage = canvas.toDataURL("image/jpeg", 0.96);
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "pt",
+      format: "letter",
+      compress: true
+    });
+
+    pdf.addImage(flatImage, "JPEG", 0, 0, 612, 792, undefined, "FAST");
+
+    // Blob download is more reliable than pdf.save() on some mobile browsers.
+    const blob = pdf.output("blob");
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Week_1_NFL_Picks.pdf";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  } catch (err) {
+    console.error("PDF export failed:", err);
+    alert("PDF export failed. Please refresh the page and try again.");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText;
+    }
   }
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF({orientation:"portrait", unit:"pt", format:"letter", compress:true});
-  const img = document.getElementById("sheetImage");
-  pdf.addImage(img.src, "JPEG", 0, 0, 612, 792, undefined, "FAST");
-
-  // Keep Name and Date removed in the exported, flattened PDF.
-  pdf.setFillColor(255,255,255);
-  pdf.rect(0, 93.8, 612, 24.3, "F");
-
-  document.querySelectorAll(".pick:checked").forEach(el => {
-    const f = FIELDS.find(v => v.name === el.dataset.field);
-    if (f) drawCheck(pdf, f);
-  });
-
-  pdf.save("Week_1_NFL_Picks.pdf");
 }
 </script>
 </body>

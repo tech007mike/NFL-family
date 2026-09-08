@@ -66,6 +66,16 @@ function drawCheck(pdf, f) {
 function exportPDF() {
   saveState();
 
+  const enteredName = prompt("Enter your name for the PDF:");
+  if (enteredName === null) return;
+
+  const safeName = enteredName.trim().replace(/[^a-zA-Z0-9]/g, "");
+  if (!safeName) {
+    alert("Please enter a name before exporting.");
+    return;
+  }
+
+  const filename = `${safeName}-NFLPICKS-WEEK1.pdf`;
   const button = document.querySelector(".toolbar button");
   const originalText = button ? button.textContent : "Export PDF";
 
@@ -94,44 +104,21 @@ function exportPDF() {
       compress: true
     });
 
-    pdf.addImage(
-      img.src,
-      "JPEG",
-      0,
-      0,
-      612,
-      792,
-      undefined,
-      "FAST"
-    );
+    pdf.addImage(img.src, "JPEG", 0, 0, 612, 792, undefined, "FAST");
 
-    // Hide the Name / Date row in the exported PDF.
     pdf.setFillColor(255, 255, 255);
-    pdf.rect(
-      0,
-      792 * 0.1185,
-      612,
-      792 * 0.0305,
-      "F"
-    );
+    pdf.rect(0, 792 * 0.1185, 612, 792 * 0.0305, "F");
 
-    // Draw selected picks directly into the PDF using field coordinates.
     document.querySelectorAll(".pick:checked").forEach(el => {
       const fieldName = el.dataset.field;
       const field = FIELDS.find(f => f.name === fieldName);
-
-      if (field) {
-        drawCheck(pdf, field);
-      }
+      if (field) drawCheck(pdf, field);
     });
 
-    pdf.save("Week_1_NFL_Picks.pdf");
+    pdf.save(filename);
   } catch (err) {
     console.error("PDF export failed:", err);
-    alert(
-      "PDF export failed.\n\n" +
-      (err && err.message ? err.message : "Unknown error")
-    );
+    alert("PDF export failed.\n\n" + (err && err.message ? err.message : "Unknown error"));
   } finally {
     if (button) {
       button.disabled = false;

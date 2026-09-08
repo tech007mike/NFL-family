@@ -19,7 +19,7 @@ jobs:
         with:
           ref: Master
 
-      - name: Replace exportPDF function
+      - name: Add clear choices button and keep PDF export
         shell: python
         run: |
           from pathlib import Path
@@ -27,10 +27,25 @@ jobs:
           path = Path("index.html")
           text = path.read_text(encoding="utf-8")
 
+          old_toolbar = '<div class="toolbar"><button type="button" onclick="exportPDF()">Export PDF</button></div>'
+          new_toolbar = '<div class="toolbar"><button type="button" onclick="clearChoices()">Clear Choices</button> <button type="button" onclick="exportPDF()">Export PDF</button></div>'
+          if old_toolbar in text:
+            text = text.replace(old_toolbar, new_toolbar, 1)
+
           start = text.index("function exportPDF() {")
           end = text.index("\n</script>", start)
 
-          replacement = r'''function exportPDF() {
+          replacement = r'''function clearChoices() {
+            if (!confirm("Clear all choices?")) return;
+
+            document.querySelectorAll(".pick:checked").forEach(el => {
+              el.checked = false;
+            });
+
+            saveState();
+          }
+
+          function exportPDF() {
             saveState();
 
             const enteredName = prompt("Enter your name for the PDF:");
@@ -43,7 +58,7 @@ jobs:
             }
 
             const filename = `${safeName}-NFLPICKS-WEEK1.pdf`;
-            const button = document.querySelector(".toolbar button");
+            const button = document.querySelector('.toolbar button[onclick="exportPDF()"]');
             const originalText = button ? button.textContent : "Export PDF";
 
             try {
@@ -96,7 +111,7 @@ jobs:
 
           path.write_text(text[:start] + replacement + text[end:], encoding="utf-8")
 
-      - name: Commit patched exporter
+      - name: Commit patched page
         run: |
           if git diff --quiet -- index.html; then
             echo "No index.html changes needed."
@@ -105,7 +120,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git commit -m "Add name prompt to PDF export"
+          git commit -m "Add Clear Choices button"
           git push origin Master
 
-# Trigger name prompt patch.
+# Trigger clear choices patch.
